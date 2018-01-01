@@ -114,6 +114,58 @@
 )
 
 
+(defn day3a
+  {:test (fn []
+    (clojure.test/is (= (day3a 1) 0))
+    (clojure.test/is (= (day3a 12) 3))
+    (clojure.test/is (= (day3a 23) 2))
+    (clojure.test/is (= (day3a 1024) 31)))}
+  [square]
+  (loop [[x y] [0 0]
+         [dx dy] [1 0]
+         pos 1]
+     (let [absx (max x (- x)) absy (max y (- y))]
+       (if (= pos square)
+         (+ absx absy)
+         (let [[dx dy] (if (or (and (= absx absy) (not (<= y 0 x))) (and (= absx (inc absy)) (<= y 0 x)))
+                         [(- dy) dx]
+                         [dx dy])]
+           (recur [(+ x dx) (+ y dy)] [dx dy] (inc pos)))))))
+
+(comment (day3a 312051)
+;;430
+)
+
+(defn day3b
+  {:test (fn []
+    (clojure.test/is (= (day3b 0) 1))
+    (clojure.test/is (= (day3b 20) 23))
+    (clojure.test/is (= (day3b 25) 26))
+    (clojure.test/is (= (day3b 800) 806)))}
+  [test-value]
+  (loop [[x y] [1 0]
+         [dx dy] [1 0]
+         grid {[0 0] 1}]
+     (let [absx (max x (- x))
+           absy (max y (- y))
+           square-value (reduce (fn [sum dir]
+                                  (+ sum (get grid (mapv + [x y] dir) 0)))
+                                0
+                                [[1 0] [1 1] [0 1] [-1 1]
+                                 [-1 0] [-1 -1] [0 -1] [1 -1]])]
+       (if (> square-value test-value)
+         square-value
+         (let [[dx dy] (if (or (and (= absx absy) (not (<= y 0 x)))
+                               (and (= absx (inc absy)) (<= y 0 x)))
+                         [(- dy) dx]
+                         [dx dy])]
+           (recur [(+ x dx) (+ y dy)] [dx dy] (assoc grid [x y] square-value)))))))
+
+(comment (day3b 312051)
+;;312453
+)
+
+
 (defn day4a
   {:test (fn []
     (clojure.test/is (day4a "aa bb cc dd ee"))
@@ -197,4 +249,178 @@
 (mapv read-string $)
 (day5b $))
 ;;25071947
+)
+
+
+(defn day6a-redist
+  {:test (fn []
+           (clojure.test/is (= (day6a-redist [0 2 7 0]) [2 4 1 2])))
+  }
+  [banks]
+  (let [idx
+        ;; (apply max-key (fn [i] (nth banks i)) (range (count banks)))
+        (.indexOf banks (apply max banks))
+        ]
+    (loop [banks2 (assoc banks idx 0)
+           idx idx
+           amount (nth banks idx)]
+           (if (= amount 0)
+           banks2
+           (let [idx (mod (inc idx) (count banks2))]
+             (recur (update banks2 idx inc) idx (dec amount)))))))
+
+
+(defn day6a
+  {:test (fn []
+           (clojure.test/is (= (day6a [0 2 7 0]) 5)))
+  }
+  [banks]
+  (println  banks)
+  (loop [banks banks states #{} steps 0]
+    (if (contains? states banks)
+      steps
+      (recur (day6a-redist banks) (conj states banks) (inc steps)))
+  )
+)
+
+(comment (as-> (slurp "data/input_day6.txt") $
+;;(clojure.string/trim)
+(clojure.string/split $ #"\t")
+(mapv read-string $)
+(day6a $))
+;;11137
+)
+
+
+(defn day6b
+  {:test (fn []
+           (clojure.test/is (= (day6b [0 2 7 0]) 4)))
+  }
+  [banks]
+  (println  banks)
+  (loop [banks banks states {} steps 0]
+    (if (contains? states banks)
+      (- steps (get states banks))
+      (recur (day6a-redist banks) (conj states {banks steps}) (inc steps)))
+  )
+)
+
+(comment (as-> (slurp "data/input_day6.txt") $
+;;(clojure.string/trim)
+(clojure.string/split $ #"\t")
+(mapv read-string $)
+(day6b $))
+;;11137
+)
+
+
+(defn day7a
+  {:test (fn []
+           (clojure.test/is (= (day7a ["pbga (66)"
+                                        "xhth (57)"
+                                        "ebii (61)"
+                                        "havc (66)"
+                                        "ktlj (57)"
+                                        "fwft (72) -> ktlj, cntj, xhth"
+                                        "qoyq (66)"
+                                        "padx (45) -> pbga, havc, qoyq"
+                                        "tknk (41) -> ugml, padx, fwft"
+                                        "jptl (61)"
+                                        "ugml (68) -> gyxo, ebii, jptl"
+                                        "gyxo (61)"
+                                        "cntj (57)"]) "tknk")))
+  }
+  [progs]
+  (let [[parents children]
+        (reduce (fn [[parents children] prog]
+            (if (clojure.string/includes? prog "->")
+              [(->> (clojure.string/split prog #" " 2)
+                    (first)
+                    (conj parents))
+               (as-> (clojure.string/split prog #"->") $
+                     (last $)
+                     (clojure.string/trim $)
+                     (clojure.string/split $ #",")
+                     (map clojure.string/trim $)
+                     (apply conj children $))]
+              [parents children]))
+          [#{} #{}]
+          progs)]
+        (-> (clojure.set/difference parents children)
+            (first)))
+  )
+
+
+  (comment (as-> (slurp "data/input_day7.txt") $
+  ;;(clojure.string/trim)
+  (clojure.string/split $ #"\n")
+  (day7a $))
+  ;;"fbgguv"
+  )
+
+
+
+(defn day7b-get-weight
+  [m h]
+  (let [p (get m h) d (get p :disc) w (get p :weight)]
+    ;;(println p d w)
+    (if d
+      (let [ws (mapv #(day7b-get-weight m %) d)
+            cw (reduce (fn [a [w tw cw]] (+ a cw)) 0 ws)]
+        ;;(println ws cw)
+        (cond
+          (not= cw 0)
+            [0 0 cw]
+          (apply = (map (fn [[w tw cw]] tw) ws))
+            [w (reduce (fn [a [w tw cw]] (+ a tw)) w ws) 0]
+          :else
+            (as-> (frequencies (map (fn [[w tw cw]] tw) ws)) $
+                  (let [ctw (key (apply max-key val $))
+                        itw (key (apply min-key val $))
+                        iw (ffirst (filter (fn [[w tw cw]] (= tw itw)) ws))]
+                    [0 0 (+ iw (- ctw itw))]))))
+      [w w 0])))
+
+(defn day7b
+  {:test (fn []
+           (clojure.test/is (= (day7b ["pbga (66)"
+                                        "xhth (57)"
+                                        "ebii (61)"
+                                        "havc (66)"
+                                        "ktlj (57)"
+                                        "fwft (72) -> ktlj, cntj, xhth"
+                                        "qoyq (66)"
+                                        "padx (45) -> pbga, havc, qoyq"
+                                        "tknk (41) -> ugml, padx, fwft"
+                                        "jptl (61)"
+                                        "ugml (68) -> gyxo, ebii, jptl"
+                                        "gyxo (61)"
+                                        "cntj (57)"]) 60)))
+  }
+  [progs]
+  (let [m (reduce
+    (fn [m s]
+      (as-> (clojure.string/replace s #"[\(\),\->]" "") $
+            (clojure.string/replace $ #"  " " ")
+            (clojure.string/split $ #" ")
+            (assoc {} :name (first $) :weight (read-string (second $)) :disc (next (next $)))
+            (assoc m (:name $) $)))
+    {}
+    progs)
+    p (set (keys m))
+    c (set (filter some? (flatten (map :disc (vals m)))))
+    h (first (clojure.set/difference p c))]
+    (last (day7b-get-weight m h))
+    ;;(println m)
+    ;;(println h)
+  )
+)
+
+
+(comment (as-> (slurp "data/input_day7.txt") $
+;;(clojure.string/trim)
+;;(clojure.string/split $ #"\n")
+(clojure.string/split-lines $)
+(day7b $))
+;;"fbgguv"
 )
